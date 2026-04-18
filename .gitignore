@@ -1,0 +1,17 @@
+# Rust build output
+/target/
+
+# Release binaries
+/dist/
+
+# Editor directories
+.vscode/
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
