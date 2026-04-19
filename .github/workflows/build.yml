@@ -12,8 +12,8 @@ on:
         type: boolean
 
 jobs:
-  build:
-    name: Build, Test & Package
+  check:
+    name: Test, Audit & Lint
     runs-on: ubuntu-latest
 
     steps:
@@ -22,12 +22,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: >
-            aarch64-apple-darwin,
-            x86_64-apple-darwin,
-            x86_64-unknown-linux-musl,
-            x86_64-pc-windows-gnu
 
       - name: Cache Cargo registry
         uses: actions/cache@v4
@@ -36,15 +30,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
-
-      - name: Install cross-compilation dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends \
-            musl-tools \
-            gcc-mingw-w64-x86-64
+          key: ${{ runner.os }}-cargo-check-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-check-
 
       - name: Run unit tests
         run: cargo test --locked
@@ -60,31 +47,93 @@ jobs:
       - name: Format check
         run: cargo fmt --check
 
-      - name: Build — linux x86_64
-        run: cargo build --release --locked --target x86_64-unknown-linux-musl
+  build:
+    name: Build — ${{ matrix.artifact }}
+    needs: check
+    runs-on: ${{ matrix.os }}
 
-      - name: Build — windows x64
-        run: cargo build --release --locked --target x86_64-pc-windows-gnu
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            artifact: pe-linux-x86_64
+            binary: pe
+            install: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends musl-tools
 
-      - name: Build — macOS arm64
-        run: cargo build --release --locked --target aarch64-apple-darwin
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: pe-windows-x86_64.exe
+            binary: pe.exe
+            install: ""
 
-      - name: Build — macOS x86_64
-        run: cargo build --release --locked --target x86_64-apple-darwin
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: pe-macos-arm64
+            binary: pe
+            install: ""
 
-      - name: Stage artifacts
-        run: |
-          mkdir -p dist
-          cp target/x86_64-unknown-linux-musl/release/pe   dist/pe-linux-x86_64
-          cp target/x86_64-pc-windows-gnu/release/pe.exe   dist/pe-windows-x86_64.exe
-          cp target/aarch64-apple-darwin/release/pe        dist/pe-macos-arm64
-          cp target/x86_64-apple-darwin/release/pe         dist/pe-macos-x86_64
+          - target: x86_64-apple-darwin
+            os: macos-13
+            artifact: pe-macos-x86_64
+            binary: pe
+            install: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
+
+      - name: Install platform dependencies
+        if: matrix.install != ''
+        run: ${{ matrix.install }}
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }}
 
       - name: End-to-end integration tests
         if: ${{ inputs.run_e2e == 'true' }}
         run: cargo test --test '*' --features e2e -- --ignored
 
-      - name: Upload artifacts
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: target/${{ matrix.target }}/release/${{ matrix.binary }}
+          retention-days: 30
+
+  package:
+    name: Package all binaries
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: Flatten into single directory
+        run: |
+          for f in dist/*/*; do mv "$f" dist/; done
+          find dist -type d -empty -delete
+
+      - name: Upload combined artifact
         uses: actions/upload-artifact@v4
         with:
           name: pe-binaries
