@@ -65,12 +65,22 @@ fn parse_branches(repo_path: &Path) -> Vec<BranchInfo> {
                         behind = n.trim().parse().unwrap_or(0);
                     }
                 }
-                Some(UpstreamInfo { remote, remote_branch, ahead, behind })
+                Some(UpstreamInfo {
+                    remote,
+                    remote_branch,
+                    ahead,
+                    behind,
+                })
             }
             _ => None,
         };
 
-        branches.push(BranchInfo { local_name, upstream, raw_line: line.to_string(), is_current });
+        branches.push(BranchInfo {
+            local_name,
+            upstream,
+            raw_line: line.to_string(),
+            is_current,
+        });
     }
 
     branches
@@ -86,7 +96,10 @@ fn print_branch_status<'a>(
     repo_name: &str,
     repo_path: &Path,
     branches: &'a [BranchInfo],
-) -> (Vec<(&'a str, &'a str, &'a str)>, Vec<(&'a str, &'a str, &'a str)>) {
+) -> (
+    Vec<(&'a str, &'a str, &'a str)>,
+    Vec<(&'a str, &'a str, &'a str)>,
+) {
     let mut ff_candidates: Vec<(&str, &str, &str)> = Vec::new();
     let mut pull_candidates: Vec<(&str, &str, &str)> = Vec::new();
 
@@ -95,7 +108,10 @@ fn print_branch_status<'a>(
         .filter(|b| matches!(&b.upstream, Some(up) if up.ahead == 0 && up.behind == 0))
         .count();
 
-    let current_branch = branches.iter().find(|b| b.is_current).map(|b| b.local_name.as_str());
+    let current_branch = branches
+        .iter()
+        .find(|b| b.is_current)
+        .map(|b| b.local_name.as_str());
 
     let mut header = format!("  {}", repo_name.cyan().bold());
     if let Some(name) = current_branch {
@@ -128,7 +144,11 @@ fn print_branch_status<'a>(
                 }
             }
             None => {
-                println!("    {}  {}", branch.raw_line, "no upstream".truecolor(255, 165, 0));
+                println!(
+                    "    {}  {}",
+                    branch.raw_line,
+                    "no upstream".truecolor(255, 165, 0)
+                );
             }
             _ => {
                 println!("    {}", branch.raw_line);
@@ -200,7 +220,10 @@ fn fetch_repo(repo_path: &Path) -> Result<FetchResult, String> {
         files_changed += count;
     }
 
-    Ok(FetchResult { updated_branches, files_changed })
+    Ok(FetchResult {
+        updated_branches,
+        files_changed,
+    })
 }
 
 // ── Group sync ────────────────────────────────────────────────────────────────
@@ -242,7 +265,11 @@ fn sync_group(group: &RepoGroup) {
                     println!(
                         "{} branch{} updated, {} file{} changed",
                         result.updated_branches.to_string().green().bold(),
-                        if result.updated_branches == 1 { "" } else { "es" },
+                        if result.updated_branches == 1 {
+                            ""
+                        } else {
+                            "es"
+                        },
                         result.files_changed.to_string().yellow().bold(),
                         if result.files_changed == 1 { "" } else { "s" },
                     );
@@ -266,7 +293,8 @@ fn sync_group(group: &RepoGroup) {
         let repo_path = Path::new(&group.path).join(repo_name);
 
         let branches = parse_branches(&repo_path);
-        let (ff_candidates, pull_candidates) = print_branch_status(repo_name, &repo_path, &branches);
+        let (ff_candidates, pull_candidates) =
+            print_branch_status(repo_name, &repo_path, &branches);
 
         for (local, remote, remote_branch) in ff_candidates {
             all_ff.push((
@@ -343,7 +371,10 @@ fn sync_group(group: &RepoGroup) {
     // Only attempt if there are no local changes in the working tree
     if !all_pull.is_empty() {
         println!();
-        println!("{}", "Pulling current branches that are behind:".bold().green());
+        println!(
+            "{}",
+            "Pulling current branches that are behind:".bold().green()
+        );
         println!("{}", "─────────────────────".dimmed());
 
         for (repo_path_str, local, _remote, _remote_branch) in &all_pull {
@@ -370,12 +401,7 @@ fn sync_group(group: &RepoGroup) {
                 continue;
             }
 
-            print!(
-                "  {} {}/{}… ",
-                "Pulling".dimmed(),
-                repo_name,
-                local.cyan()
-            );
+            print!("  {} {}/{}… ", "Pulling".dimmed(), repo_name, local.cyan());
             let _ = std::io::stdout().flush();
 
             let result = Command::new("git")
@@ -411,11 +437,7 @@ fn sync_group(group: &RepoGroup) {
 pub fn run(cfg: &Config, group_name: Option<&str>) {
     match group_name {
         Some(name) => match cfg.monitored_repos.iter().find(|g| g.name == name) {
-            None => eprintln!(
-                "{} Group {} not found",
-                "Error:".red().bold(),
-                name.cyan()
-            ),
+            None => eprintln!("{} Group {} not found", "Error:".red().bold(), name.cyan()),
             Some(group) => sync_group(group),
         },
         None => {

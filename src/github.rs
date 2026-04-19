@@ -123,7 +123,11 @@ fn parse_github_repo(remote_url: &str) -> Option<ParsedRepo> {
         let mut path_parts = path.splitn(2, '/');
         let owner = path_parts.next()?.to_string();
         let repo = path_parts.next()?.to_string();
-        Some(ParsedRepo { owner, repo, api_base: api_base_for(hostname) })
+        Some(ParsedRepo {
+            owner,
+            repo,
+            api_base: api_base_for(hostname),
+        })
     } else if url.starts_with("https://") || url.starts_with("http://") {
         // https://hostname/owner/repo[.git]
         let rest = url.split_once("://")?.1;
@@ -133,7 +137,11 @@ fn parse_github_repo(remote_url: &str) -> Option<ParsedRepo> {
         let mut path_parts = path.splitn(2, '/');
         let owner = path_parts.next()?.to_string();
         let repo = path_parts.next()?.to_string();
-        Some(ParsedRepo { owner, repo, api_base: api_base_for(hostname) })
+        Some(ParsedRepo {
+            owner,
+            repo,
+            api_base: api_base_for(hostname),
+        })
     } else {
         None
     }
@@ -171,18 +179,23 @@ pub fn print_pull_requests(remote_url: &str, token: Option<&str>, show_banner: b
     let base = format!("{}/repos/{}/{}", parsed.api_base, parsed.owner, parsed.repo);
 
     // List open PRs
-    let pr_list: Vec<GhPr> = match api_get(&format!("{}/pulls?state=open&per_page=100", base), token) {
-        Ok(p) => p,
-        Err(e) => {
-            if show_banner {
-                println!();
-                println!("{}", "Open Pull Requests:".bold().green());
-                println!("{}", "─────────────────────".dimmed());
+    let pr_list: Vec<GhPr> =
+        match api_get(&format!("{}/pulls?state=open&per_page=100", base), token) {
+            Ok(p) => p,
+            Err(e) => {
+                if show_banner {
+                    println!();
+                    println!("{}", "Open Pull Requests:".bold().green());
+                    println!("{}", "─────────────────────".dimmed());
+                }
+                println!(
+                    "  {} {}",
+                    "Could not fetch pull requests:".red(),
+                    e.dimmed()
+                );
+                return false;
             }
-            println!("  {} {}", "Could not fetch pull requests:".red(), e.dimmed());
-            return false;
-        }
-    };
+        };
 
     if pr_list.is_empty() {
         if show_banner {
@@ -205,19 +218,18 @@ pub fn print_pull_requests(remote_url: &str, token: Option<&str>, show_banner: b
 
     for summary in &pr_list {
         // Fetch individual PR to get mergeable / mergeable_state
-        let pr: GhPr =
-            match api_get(&format!("{}/pulls/{}", base, summary.number), token) {
-                Ok(p) => p,
-                Err(e) => {
-                    println!(
-                        "  {} #{}: {}",
-                        "Could not fetch PR".red(),
-                        summary.number,
-                        e.dimmed()
-                    );
-                    continue;
-                }
-            };
+        let pr: GhPr = match api_get(&format!("{}/pulls/{}", base, summary.number), token) {
+            Ok(p) => p,
+            Err(e) => {
+                println!(
+                    "  {} #{}: {}",
+                    "Could not fetch PR".red(),
+                    summary.number,
+                    e.dimmed()
+                );
+                continue;
+            }
+        };
 
         // ── Title ────────────────────────────────────────────────────���───────
         let draft_tag = if pr.draft {
@@ -250,7 +262,11 @@ pub fn print_pull_requests(remote_url: &str, token: Option<&str>, show_banner: b
         }
 
         // ── Merge status ─────────────────────────────────────────────────────
-        println!("    {} {}", "Merge status:".normal(), merge_status_label(&pr));
+        println!(
+            "    {} {}",
+            "Merge status:".normal(),
+            merge_status_label(&pr)
+        );
 
         // ── Check runs ───────────────────────────────────────────────────────
         let checks: GhCheckRunsPage = api_get(
@@ -278,10 +294,7 @@ pub fn print_pull_requests(remote_url: &str, token: Option<&str>, show_banner: b
                 })
                 .map(|r| r.name.as_str())
                 .collect();
-            let running = by_name
-                .values()
-                .filter(|r| r.status != "completed")
-                .count();
+            let running = by_name.values().filter(|r| r.status != "completed").count();
             let passed = by_name
                 .values()
                 .filter(|r| {
@@ -384,7 +397,13 @@ fn days_in_month(m: i64, y: i64) -> i64 {
     match m {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         4 | 6 | 9 | 11 => 30,
-        2 => if is_leap(y) { 29 } else { 28 },
+        2 => {
+            if is_leap(y) {
+                29
+            } else {
+                28
+            }
+        }
         _ => 0,
     }
 }
@@ -399,7 +418,8 @@ fn iso8601_to_epoch(s: &str) -> Option<i64> {
     let mut t = time_part.split(':');
     let hour: i64 = t.next()?.parse().ok()?;
     let min: i64 = t.next()?.parse().ok()?;
-    let sec: i64 = t.next()
+    let sec: i64 = t
+        .next()
         .and_then(|s| s.split('.').next())
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
@@ -501,11 +521,6 @@ pub fn print_workflows(remote_url: &str, token: Option<&str>, verbose: bool) {
             .map(|epoch| relative_time(now - epoch))
             .unwrap_or_else(|| "—".to_string());
 
-        println!(
-            "    {:<50} {}  {}",
-            wf.name,
-            status_str,
-            time_str.dimmed()
-        );
+        println!("    {:<50} {}  {}", wf.name, status_str, time_str.dimmed());
     }
 }

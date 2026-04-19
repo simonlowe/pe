@@ -4,7 +4,11 @@ use std::path::Path;
 use std::process::Command;
 
 fn git_in(dir: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git").args(args).current_dir(dir).output().ok()?;
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .ok()?;
     if output.status.success() {
         Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
@@ -64,11 +68,7 @@ fn workflows_for_group(group: &RepoGroup, cfg: &Config, verbose: bool) {
 pub fn run(cfg: &Config, group_name: Option<&str>, verbose: bool) {
     match group_name {
         Some(name) => match cfg.monitored_repos.iter().find(|g| g.name == name) {
-            None => eprintln!(
-                "{} Group {} not found",
-                "Error:".red().bold(),
-                name.cyan()
-            ),
+            None => eprintln!("{} Group {} not found", "Error:".red().bold(), name.cyan()),
             Some(group) => workflows_for_group(group, cfg, verbose),
         },
         None => {

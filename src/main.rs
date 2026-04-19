@@ -9,12 +9,7 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 
 #[derive(Parser)]
-#[command(
-    name = "pe",
-    about = "Principal Engineer",
-    version,
-    author
-)]
+#[command(name = "pe", about = "Principal Engineer", version, author)]
 struct Cli {
     /// Enable verbose output
     #[arg(short, long, global = true)]
@@ -137,7 +132,14 @@ fn main() {
         Some(Commands::Workflows { group }) => {
             workflows::run(&cfg, group.as_deref(), cli.verbose);
         }
-        Some(Commands::Config { repo_pattern, github_token, group, repo_folder, delete, list }) => {
+        Some(Commands::Config {
+            repo_pattern,
+            github_token,
+            group,
+            repo_folder,
+            delete,
+            list,
+        }) => {
             match (repo_pattern, github_token, group, repo_folder, delete, list) {
                 // ── Token management ──────────────────────────────────────────
                 (Some(pattern), Some(token), None, None, false, false) => {
@@ -172,21 +174,25 @@ fn main() {
                     }
                 }
                 (Some(_), Some(_), None, None, true, false) => {
-                    eprintln!("{} --github_token and --delete cannot be used together", "Error:".red().bold());
+                    eprintln!(
+                        "{} --github_token and --delete cannot be used together",
+                        "Error:".red().bold()
+                    );
                 }
                 (Some(_), None, None, None, false, false) => {
-                    eprintln!("{} provide either --github_token (-k) to set or --delete (-d) to remove", "Error:".red().bold());
+                    eprintln!(
+                        "{} provide either --github_token (-k) to set or --delete (-d) to remove",
+                        "Error:".red().bold()
+                    );
                 }
 
                 // ── Group management ──────────────────────────────────────────
                 (None, None, Some(name), None, false, true) => {
                     // List group details
                     match cfg.monitored_repos.iter().find(|g| g.name == name) {
-                        None => eprintln!(
-                            "{} Group {} not found",
-                            "Error:".red().bold(),
-                            name.cyan()
-                        ),
+                        None => {
+                            eprintln!("{} Group {} not found", "Error:".red().bold(), name.cyan())
+                        }
                         Some(group) => {
                             println!("{} {}", "Group:".bold().green(), group.name.cyan().bold());
                             println!("  {} {}", "Path:".normal(), group.path.yellow());
@@ -255,25 +261,20 @@ fn main() {
                     let before = cfg.monitored_repos.len();
                     cfg.monitored_repos.retain(|g| g.name != name);
                     if cfg.monitored_repos.len() == before {
-                        eprintln!(
-                            "{} Group {} not found",
-                            "Error:".red().bold(),
-                            name.cyan()
-                        );
+                        eprintln!("{} Group {} not found", "Error:".red().bold(), name.cyan());
                     } else {
                         match config::save(&cfg, cli.config_file.as_deref()) {
-                            Ok(_) => println!(
-                                "{} group {}",
-                                "Deleted".green().bold(),
-                                name.cyan()
-                            ),
+                            Ok(_) => println!("{} group {}", "Deleted".green().bold(), name.cyan()),
                             Err(e) => eprintln!("{} {}", "Error:".red().bold(), e),
                         }
                     }
                 }
 
                 (_, _, _, _, _, _) => {
-                    eprintln!("{} Invalid combination of flags. Use --help for usage.", "Error:".red().bold());
+                    eprintln!(
+                        "{} Invalid combination of flags. Use --help for usage.",
+                        "Error:".red().bold()
+                    );
                 }
             }
         }

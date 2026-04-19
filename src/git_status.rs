@@ -27,15 +27,14 @@ pub fn run(cfg: &Config) {
     }
 
     print!("{}", "Fetching remotes…".dimmed());
-    match Command::new("git").args(["fetch", "--all", "--prune"]).output() {
+    match Command::new("git")
+        .args(["fetch", "--all", "--prune"])
+        .output()
+    {
         Ok(out) if out.status.success() => println!(" {}", "done".dimmed()),
         Ok(out) => println!(
             " {}",
-            format!(
-                "warning: {}",
-                String::from_utf8_lossy(&out.stderr).trim()
-            )
-            .yellow()
+            format!("warning: {}", String::from_utf8_lossy(&out.stderr).trim()).yellow()
         ),
         Err(e) => println!(" {}", format!("failed: {}", e).yellow()),
     }
@@ -67,8 +66,8 @@ pub fn run(cfg: &Config) {
     }
 
     // Current branch
-    let current = git(&["branch", "--show-current"])
-        .unwrap_or_else(|| "(detached HEAD)".to_string());
+    let current =
+        git(&["branch", "--show-current"]).unwrap_or_else(|| "(detached HEAD)".to_string());
     let branch_display = if current == "main" {
         current.green().bold()
     } else {
@@ -106,16 +105,13 @@ pub fn run(cfg: &Config) {
     println!("{}", "Branch Tracking:".bold().green());
     println!("{}", "─────────────────────".dimmed());
 
-
     for branch in &local_branches {
         let upstream_remote = git(&["config", &format!("branch.{}.remote", branch)]);
         let upstream_merge = git(&["config", &format!("branch.{}.merge", branch)]);
 
         match (upstream_remote, upstream_merge) {
             (Some(remote), Some(merge)) => {
-                let upstream_branch = merge
-                    .trim_start_matches("refs/heads/")
-                    .to_string();
+                let upstream_branch = merge.trim_start_matches("refs/heads/").to_string();
 
                 if upstream_branch != *branch {
                     println!(
@@ -184,7 +180,12 @@ pub fn run(cfg: &Config) {
                         .strip_prefix(&format!("{}/", remote))
                         .unwrap_or(b)
                         .to_string();
-                    Some(format!("{} ({} unmerged commit{})", branch_name, count, if count == 1 { "" } else { "s" }))
+                    Some(format!(
+                        "{} ({} unmerged commit{})",
+                        branch_name,
+                        count,
+                        if count == 1 { "" } else { "s" }
+                    ))
                 } else {
                     None
                 }
