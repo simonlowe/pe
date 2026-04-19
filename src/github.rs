@@ -126,7 +126,7 @@ fn parse_github_repo(remote_url: &str) -> Option<ParsedRepo> {
         Some(ParsedRepo { owner, repo, api_base: api_base_for(hostname) })
     } else if url.starts_with("https://") || url.starts_with("http://") {
         // https://hostname/owner/repo[.git]
-        let rest = url.splitn(2, "://").nth(1)?;
+        let rest = url.split_once("://")?.1;
         let mut parts = rest.splitn(2, '/');
         let hostname = parts.next()?;
         let path = parts.next()?.trim_end_matches(".git");

@@ -81,6 +81,7 @@ fn parse_branches(repo_path: &Path) -> Vec<BranchInfo> {
 //   .0  ff candidates  (local, remote, remote_branch) — not current, only behind
 //   .1  pull candidates (local, remote, remote_branch) — current branch, only behind
 
+#[allow(clippy::type_complexity)]
 fn print_branch_status<'a>(
     repo_name: &str,
     repo_path: &Path,
