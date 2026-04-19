@@ -1,0 +1,92 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: "Run end-to-end integration tests"
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  build:
+    name: Build, Test & Package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-apple-darwin,
+            x86_64-apple-darwin,
+            x86_64-unknown-linux-musl,
+            x86_64-pc-windows-gnu
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Install cross-compilation dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            musl-tools \
+            gcc-mingw-w64-x86-64
+
+      - name: Run unit tests
+        run: cargo test --locked
+
+      - name: Security audit
+        run: |
+          cargo install cargo-audit --locked --quiet
+          cargo audit
+
+      - name: Code quality check (clippy)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Build — linux x86_64
+        run: cargo build --release --locked --target x86_64-unknown-linux-musl
+
+      - name: Build — windows x64
+        run: cargo build --release --locked --target x86_64-pc-windows-gnu
+
+      - name: Build — macOS arm64
+        run: cargo build --release --locked --target aarch64-apple-darwin
+
+      - name: Build — macOS x86_64
+        run: cargo build --release --locked --target x86_64-apple-darwin
+
+      - name: Stage artifacts
+        run: |
+          mkdir -p dist
+          cp target/x86_64-unknown-linux-musl/release/pe   dist/pe-linux-x86_64
+          cp target/x86_64-pc-windows-gnu/release/pe.exe   dist/pe-windows-x86_64.exe
+          cp target/aarch64-apple-darwin/release/pe        dist/pe-macos-arm64
+          cp target/x86_64-apple-darwin/release/pe         dist/pe-macos-x86_64
+
+      - name: End-to-end integration tests
+        if: ${{ inputs.run_e2e == 'true' }}
+        run: cargo test --test '*' --features e2e -- --ignored
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pe-binaries
+          path: dist/
+          retention-days: 30
