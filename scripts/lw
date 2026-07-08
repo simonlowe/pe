@@ -1,0 +1,63 @@
+#!/bin/bash
+set -eo pipefail
+
+# portable-monitor-attached
+# Called when the MB16A portable monitor is detected as connected.
+portable-monitor-attached() {
+    echo "Portable monitor (MB16A) attached"
+}
+
+detect-monitor-setup() {
+    local monitors
+    monitors=$(aerospace list-monitors)
+
+    if [[ "$monitors" == "1 | Built-in Retina Display" ]]; then
+        MONITORSETUP=JUSTLAPTOP
+    elif echo "$monitors" | grep -q "DELL"; then
+        MONITORSETUP=WORK
+    elif echo "$monitors" | grep -q "SAMSUNG"; then
+        MONITORSETUP=HOME
+    fi
+
+    if echo "$monitors" | grep -q "MB16A"; then
+        portable-monitor-attached
+    fi
+}
+
+# send-to-workspace <app-name-regex> <window-title-regex> <workspace>
+# Moves every window whose app name matches <app-name-regex> and whose title
+# matches <window-title-regex> to <workspace>.
+send-to-workspace() {
+    local app_regex="$1"
+    local title_regex="$2"
+    local workspace="$3"
+
+    aerospace list-windows --all --format $'%{window-id}\t%{workspace}\t%{app-name}\t%{window-title}' |
+        while IFS=$'\t' read -r window_id window_workspace app_name window_title; do
+            if [[ "$app_name" =~ $app_regex && "$window_title" =~ $title_regex && "$window_workspace" != "$workspace" ]]; then
+               echo "moving $window_id to $workspace"
+                aerospace move-node-to-workspace --window-id "$window_id" "$workspace"
+            fi
+        done
+}
+
+# list-windows-info
+# Prints window title, workspace number, and monitor for every window.
+list-windows-info() {
+    aerospace list-windows --all --format $'%{monitor-name}\t%{workspace}\t%{app-name}\t%{window-id}\t%{window-title}' |
+        awk -F'\t' -v OFS='\t' '{ printf "%-26s\t%s\t%-20s\t%s\t%s\n", $1, $2, $3, $4, $5 }'
+}
+
+standardise-windows() {
+    send-to-workspace "^GitKraken$" ".*" 8
+    send-to-workspace "^Code$" ".*" 3
+}
+
+if [[ "$#" -gt 0 ]]; then
+    "$@"
+else
+    detect-monitor-setup
+    echo "Monitor Set up is: $MONITORSETUP"
+    standardise-windows
+    list-windows-info
+fi
